@@ -92,9 +92,10 @@ python main.py
 
 ## 👥 Participantes
 
-* Caio Furtado de Miranda Carvalho
-* Milo Castro
+* Caio Furtado
 * Emanuel Henry
+* Hailton Neto
+* Milo Castro
 * Sofia Travassos
 * Vinícius Souza
 
