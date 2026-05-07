@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from pymongo import MongoClient
 
 load_dotenv()
 
@@ -9,7 +10,29 @@ class DatabaseConnector:
     def __init__(self):
         self.mysql_uri = os.getenv("MYSQL_URI")
 
+        self.mongo_uri = os.getenv("MONGO_URI")
+        self.mongo_db_name = os.getenv("MONGO_DB_NAME")
+        self.mongo_collection = os.getenv("MONGO_COLLECTION")
+
     def carregar_mysql(self, df: pd.DataFrame, nome_tabela: str = "editais_recife"):
         if not df.empty:
             engine = create_engine(self.mysql_uri)
             df.to_sql(nome_tabela, con=engine, if_exists='replace', index=False)
+
+    def carregar_mongo(self, dados: list):
+        if not dados:
+            print("Aviso: Lista de dados para MongoDB está vazia. Nada para salvar.")
+            return
+        
+        try:
+            client = MongoClient(self.mongo_uri, tlsAllowInvalidCertificates=True)
+            db = client[self.mongo_db_name]
+            collection = db[self.mongo_collection]
+
+            print("Disparando gatilho de streaming...")
+            print(f"{len(dados)} novos registros para MongoDB. Enviando para coleção '{self.mongo_collection}'...")
+            collection.insert_many(dados)
+            client.close()
+        except Exception as e:
+            print(f"Erro ao conectar ou inserir dados no MongoDB: {e}")
+
