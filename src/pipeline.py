@@ -23,3 +23,7 @@ class PipelineETL:
         
         self.db_connector.carregar_mysql(df_transformado)
         print("Tabela editais_recife criada e dados salvos no MySQL!")
+
+        dados_streaming = df_transformado.to_dict(orient="records")
+        self.db_connector.carregar_mongo(dados_streaming)
+        print("Dados salvos no MongoDB! Pronto para streaming e notificações!")
