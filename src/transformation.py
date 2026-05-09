@@ -19,7 +19,8 @@ class TransformadorDados:
             'anoCompra', 
             'objetoCompra', 
             'valorTotalEstimado', 
-            'dataAtualizacao'
+            'dataAtualizacao',
+            'uf'
         ]
         
         colunas_presentes = [coluna for coluna in colunas_interesse if coluna in df.columns]

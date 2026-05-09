@@ -19,6 +19,7 @@ class ConnectionManager:
     Feito para organização geral do código e que a lógica de WebSocket 
     não fique bagunçada/misturada com o resto do código.
     """
+    
     def __init__(self):
         self.conexoes_ativas: set[WebSocket] = set()
 
@@ -47,9 +48,9 @@ class ConnectionManager:
         for conexao in clientes_desconectados:
             self.desconectar(conexao)
 
-"""
-Rota do WebSocket (com FastAPI)
-"""
+
+# Rota do WebSocket (com FastAPI)
+
 
 manager = ConnectionManager()
 
@@ -65,9 +66,9 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"Erro na conexão WebSocket: {e}")
         manager.desconectar(websocket)
 
-"""
-Tarefa de Background (com FastAPI)
-"""
+
+# Tarefa de Background (com FastAPI)
+
 
 async def monitorar_novas_licitacoes():
     """
