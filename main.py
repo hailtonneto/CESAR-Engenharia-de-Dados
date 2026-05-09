@@ -1,18 +1,12 @@
 import traceback
+from src.pipeline import pipeline_licitacoes_flow
 
 if __name__ == "__main__":
-    print("1. Iniciando o programa ETL...")
+    print("Iniciando Orquestração Prefect...")
     try:
-        from src.pipeline import PipelineETL
-        print("2. Bibliotecas carregadas com sucesso!")
-        
-        etl = PipelineETL()
-        print("3. Conectando à API de Consultas...")
-        
-        etl.executar("20260430")
-        
-        print("4. Processo finalizado. Verifique seu banco de dados!")
+        pipeline_licitacoes_flow(data_final="20260530")
+        print("Fluxo finalizado com sucesso!")
         
     except Exception as erro:
-        print("Ocorreu um erro na execução do código:")
+        print(f"Erro na orquestração: {erro}")
         print(traceback.format_exc())
