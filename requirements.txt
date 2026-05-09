@@ -4,3 +4,4 @@ pymongo
 sqlalchemy
 mysql-connector-python
 python-dotenv
+prefect

@@ -18,7 +18,7 @@ class ExtratorPNCP:
             }
             
             try:
-                resposta = requests.get(self.base_url, params=parametros)
+                resposta = requests.get(self.base_url, params=parametros, timeout=15)
                 resposta.raise_for_status()
                 
                 dados = resposta.json()
@@ -35,6 +35,6 @@ class ExtratorPNCP:
                 
             except requests.exceptions.RequestException as erro:
                 print(f"Erro de conexão na página {pagina}: {erro}")
-                break
+                raise erro
                 
         return todos_os_dados
