@@ -13,6 +13,7 @@ class ExtratorPNCP:
                 "dataFinal": data_final,
                 "codigoModalidadeContratacao": "8",
                 "uf": "pe",
+                "codigoMunicipiolbge": "2611606", # filtro de recife
                 "pagina": str(pagina),
                 "tamanhoPagina": "20"
             }
