@@ -7,6 +7,11 @@ class TransformadorDados:
         for item in dados_brutos:
             valor = item.get('valorTotalEstimado')
             if valor is not None and float(valor) < 81000:
+                unidade = item.get('unidadeOrgao', {})
+
+                item['municipioNome'] = unidade.get('municipioNome', 'Não Informado')
+                item ['codigoIbge'] = unidade.get('codigoIbge', '')
+
                 dados_filtrados.append(item)
                 
         df = pd.DataFrame(dados_filtrados)
@@ -20,7 +25,8 @@ class TransformadorDados:
             'objetoCompra', 
             'valorTotalEstimado', 
             'dataAtualizacao',
-            'uf'
+            'uf',
+            'municipioNome'
         ]
         
         colunas_presentes = [coluna for coluna in colunas_interesse if coluna in df.columns]
