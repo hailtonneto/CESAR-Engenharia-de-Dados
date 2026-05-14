@@ -75,13 +75,15 @@ async def monitorar_novas_licitacoes():
     Monitora o MongoDB para procurar novas licitações
     Quando o ETL salvar algo, ele detecta e avisa ao Manager.
     """
-
     try:
         async with collection.watch([{"$match": {"operationType": "insert"}}]) as stream:
             async for change in stream:
                 nova_licitacao = change["fullDocument"]
                 nova_licitacao["_id"] = str(nova_licitacao["_id"])
-                if nova_licitacao.get("uf") == "pe":
+
+                municipio = nova_licitacao.get("municipioNome", "")
+                
+                if municipio.upper() == "RECIFE":
                     await manager.broadcast_licitacao(nova_licitacao)
     except Exception as e:
         print(f"Erro ao monitorar novas licitações: {e}")
