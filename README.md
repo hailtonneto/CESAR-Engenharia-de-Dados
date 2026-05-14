@@ -1,7 +1,7 @@
 # 🚀 Projeto ETL — Dados do PNCP (Recife)
 
 ## 📌 Visão Geral
-Este projeto tem como objetivo implementar um pipeline de **ETL (Extract, Transform, Load)** para dados de contratações públicas da cidade do Recife, utilizando a API do **Portal Nacional de Contratações Públicas (PNCP)**.
+Este projeto tem como objetivo implementar um pipeline de **ETL (Extract, Transform, Load)** para dados de contratações públicas da cidade do Recife, utilizando a API do <a href='https://www.gov.br/pncp/pt-br/pncp/manuais/versoes-anteriores/ManualPNCPAPIConsultasVerso1.0.pdf'>Portal Nacional de Contratações Públicas (PNCP)</a>.
 
 A proposta foca na aplicação de boas práticas de **Engenharia de Dados**, incluindo organização de código, separação de responsabilidades e persistência em diferentes tipos de banco de dados.
 
