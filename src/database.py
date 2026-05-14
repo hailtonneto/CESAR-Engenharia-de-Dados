@@ -29,10 +29,19 @@ class DatabaseConnector:
             db = client[self.mongo_db_name]
             collection = db[self.mongo_collection]
 
-            print("Disparando gatilho de streaming...")
-            print(f"{len(dados)} novos registros para MongoDB. Enviando para coleção '{self.mongo_collection}'...")
-            collection.insert_many(dados)
+            operacoes = []
+            for item in dados:
+                operacoes.append(
+                    UpdateOne(
+                        {"numeroCompra": item.get("numeroCompra")}, 
+                        {"$set": item}, 
+                        upsert=True
+                    )
+                )
+
+            print("Sincronizando dados com MongoDB...")
+            resultado = collection.bulk_write(operacoes)
+            print(f"Inseridos: {resultado.upserted_count} | Modificados: {resultado.modified_count}")
             client.close()
         except Exception as e:
             print(f"Erro ao conectar ou inserir dados no MongoDB: {e}")
-
