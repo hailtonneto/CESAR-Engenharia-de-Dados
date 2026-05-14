@@ -1,29 +1,46 @@
+from prefect import flow, task
 from src.extraction import ExtratorPNCP
 from src.transformation import TransformadorDados
 from src.database import DatabaseConnector
 
-class PipelineETL:
-    def __init__(self):
-        self.extrator = ExtratorPNCP()
-        self.transformador = TransformadorDados()
-        self.db_connector = DatabaseConnector()
+@task(retries=3, retry_delay_seconds=60, name="Extrair Dados PNCP")
+def extrair_task(extrator, data_final):
+    return extrator.extrair(data_final)
 
-    def executar(self, data_final: str):
-        print(f"Buscando propostas em aberto no PE até: {data_final}...")
-        
-        dados_brutos = self.extrator.extrair(data_final)
-        print(f"Encontrados na API: {len(dados_brutos)} registros!")
-        
-        if not dados_brutos:
-            print("Aviso: A API retornou vazio! Nada para salvar no banco.")
-            return
-            
-        df_transformado = self.transformador.transformar(dados_brutos)
-        print(f"Dados transformados com sucesso! Linhas prontas: {len(df_transformado)}")
-        
-        self.db_connector.carregar_mysql(df_transformado)
-        print("Tabela editais_recife criada e dados salvos no MySQL!")
+@task(name="Transformar Dados")
+def transformar_task(transformador, dados_brutos):
+    return transformador.transformar(dados_brutos)
 
-        dados_streaming = df_transformado.to_dict(orient="records")
-        self.db_connector.carregar_mongo(dados_streaming)
-        print("Dados salvos no MongoDB! Pronto para streaming e notificações!")
+@task(name="Carregar MySQL (Batch)")
+def carregar_mysql_task(db_connector, df):
+    db_connector.carregar_mysql(df)
+
+@task(name="Carregar MongoDB (Streaming)")
+def carregar_mongo_task(db_connector, dados):
+    db_connector.carregar_mongo(dados)
+
+@flow(name="Pipeline ETL Licitações MEI")
+def pipeline_licitacoes_flow(data_final: str = "20260530"):
+    extrator = ExtratorPNCP()
+    transformador = TransformadorDados()
+    db_connector = DatabaseConnector()
+
+    dados_brutos = extrair_task(extrator, data_final)
+    
+    if not dados_brutos:
+        print("Aviso: Sem dados para processar.")
+        return
+
+    df_transformado = transformar_task(transformador, dados_brutos)
+    
+    if df_transformado.empty:
+        print("Aviso: DataFrame vazio após transformação.")
+        return
+
+    carregar_mysql_task(db_connector, df_transformado)
+    
+    dados_streaming = df_transformado.to_dict(orient="records")
+    carregar_mongo_task(db_connector, dados_streaming)
+
+if __name__ == "__main__":
+    pipeline_licitacoes_flow()
