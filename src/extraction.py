@@ -4,16 +4,17 @@ class ExtratorPNCP:
     def __init__(self):
         self.base_url = "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta"
 
-    def extrair(self, data_final: str):
+    def extrair(self, data_inicial: str, data_final: str, uf: str):
         todos_os_dados = []
         paginas_a_extrair = 5
         
         for pagina in range(1, paginas_a_extrair + 1):
             parametros = {
+                "dataInicial": data_inicial,
                 "dataFinal": data_final,
                 "codigoModalidadeContratacao": "8",
-                "uf": "pe",
-                "codigoMunicipiolbge": "2611606", # filtro de recife
+                "uf": uf,
+                "codigoMunicipiolbge": "2611606",
                 "pagina": str(pagina),
                 "tamanhoPagina": "20"
             }
