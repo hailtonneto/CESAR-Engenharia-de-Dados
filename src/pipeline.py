@@ -1,57 +1,96 @@
 import uuid
-import logging
+import pandas as pd
+
+from prefect import flow, task, get_run_logger
+from dotenv import load_dotenv
+
 from src.extraction import ExtratorPNCP
-from src.transformation import TransformadorDados
 from src.database import DatabaseConnector
 
-logger = logging.getLogger("etl.pipeline")
+load_dotenv()
 
 
-class PipelineETL:
+@task(
+    name="Extração PNCP",
+    retries=3,
+    retry_delay_seconds=15,
+    description="Busca contratações na API do PNCP página a página.",
+)
+def task_extrair(data_inicial: str, data_final: str, uf: str) -> list[dict]:
+    logger = get_run_logger()
+    logger.info(
+        f"Iniciando extração | UF={uf.upper()} "
+        f"| data_inicial={data_inicial} | data_final={data_final}"
+    )
+    extrator = ExtratorPNCP()
+    dados = extrator.extrair(
+        data_inicial=data_inicial,
+        data_final=data_final,
+        uf=uf,
+    )
+    logger.info(f"{len(dados)} registros extraídos da API PNCP.")
+    return dados
 
-    def __init__(self):
-        self.extrator = ExtratorPNCP()
-        self.transformador = TransformadorDados()
-        self.db_connector = DatabaseConnector()
 
-    def executar(
-        self,
-        data_final: str,
-        uf: str = "pe",
-        valor_maximo: float | None = None,
-    ) -> None:
-        
-        run_id = str(uuid.uuid4())  
-        logger.info(f"{'='*60}")
-        logger.info(f"PIPELINE INICIADO | run_id={run_id}")
-        logger.info(f"Parâmetros: uf={uf.upper()} | data_final={data_final} | valor_maximo={valor_maximo}")
-        logger.info(f"{'='*60}")
+@task(
+    name="Carga MongoDB (brutos)",
+    retries=2,
+    retry_delay_seconds=10,
+    description="Persiste os dados brutos no MongoDB Atlas (camada raw/bronze).",
+)
+def task_carregar_mongodb(dados_brutos: list[dict], run_id: str) -> None:
+    logger = get_run_logger()
+    if not dados_brutos:
+        logger.warning("Nenhum dado bruto para inserir no MongoDB.")
+        return
+    db = DatabaseConnector()
+    db.carregar_mongodb(dados_brutos, run_id=run_id)
+    logger.info(f"{len(dados_brutos)} documentos enviados ao MongoDB Atlas.")
 
-        dados_brutos = self.extrator.extrair(data_final=data_final, uf=uf)
-        logger.info(f"[EXTRAÇÃO] {len(dados_brutos)} registros brutos obtidos da API.")
 
-        if not dados_brutos:
-            logger.warning("[PIPELINE] API retornou vazio. Nenhum dado para processar.")
-            return
+@flow(
+    name="ETL PNCP — Contratações Pernambuco",
+    description=(
+        "Pipeline completo: extrai contratações do PNCP e persiste dados brutos "
+        "no MongoDB (bronze). Transformação e carga MySQL feitas pelo PySpark."
+    ),
+    log_prints=True,
+)
+def etl_pncp_flow(
+    data_inicial: str = "20250101",
+    data_final: str = "20250430",
+    uf: str = "pe",
+) -> None:
+    run_id = str(uuid.uuid4())
+    logger = get_run_logger()
 
-        logger.info("[CARGA] Enviando dados brutos ao MongoDB Atlas...")
-        self.db_connector.carregar_mongodb(dados_brutos, run_id=run_id)
+    logger.info("=" * 60)
+    logger.info(f"PIPELINE INICIADO  |  run_id={run_id}")
+    logger.info(
+        f"Parâmetros: uf={uf.upper()} | {data_inicial} → {data_final}"
+    )
+    logger.info("=" * 60)
 
-        logger.info("[TRANSFORMAÇÃO] Iniciando limpeza e filtragem...")
-        df_transformado = self.transformador.transformar(
-            dados_brutos,
-            valor_maximo=valor_maximo,
-            uf=uf,
-        )
-        logger.info(f"[TRANSFORMAÇÃO] {len(df_transformado)} registros após transformação.")
+    dados_brutos = task_extrair(
+        data_inicial=data_inicial,
+        data_final=data_final,
+        uf=uf,
+    )
 
-        if df_transformado.empty:
-            logger.warning("[PIPELINE] Nenhum dado sobrou após transformação. MySQL não será atualizado.")
-            return
+    if not dados_brutos:
+        logger.warning("API retornou vazio. Pipeline encerrado sem carga.")
+        return
 
-        logger.info("[CARGA] Enviando dados transformados ao MySQL...")
-        self.db_connector.carregar_mysql(df_transformado)
+    task_carregar_mongodb(dados_brutos=dados_brutos, run_id=run_id)
 
-        logger.info(f"{'='*60}")
-        logger.info(f"PIPELINE CONCLUÍDO COM SUCESSO | run_id={run_id}")
-        logger.info(f"{'='*60}")
+    logger.info("=" * 60)
+    logger.info(f"PIPELINE CONCLUÍDO COM SUCESSO  |  run_id={run_id}")
+    logger.info("=" * 60)
+
+
+if __name__ == "__main__":
+    etl_pncp_flow(
+        data_inicial="20260101",
+        data_final="20260530",
+        uf="pe",
+    )
