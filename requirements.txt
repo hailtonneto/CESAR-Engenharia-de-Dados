@@ -1,10 +1,17 @@
+# Dependências base do projeto ETL
 requests
 pandas
 pymongo
 sqlalchemy
 mysql-connector-python
 python-dotenv
-fastapi 
-uvicorn 
+fastapi
+uvicorn
 motor
 prefect
+
+# MCP + Chatbot
+fastmcp
+mcp[cli]
+streamlit
+google-genai
