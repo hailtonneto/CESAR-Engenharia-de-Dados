@@ -239,12 +239,12 @@ if "pending_message" not in st.session_state:
     st.session_state.pending_message = None
 
 SUGESTOES = [
-    "📊 Quantos registros temos no banco?",
-    "💰 Quais as contratações de maior valor?",
-    "🏙️ Quais municípios têm mais contratos?",
-    "🔍 Busque contratos de tecnologia",
-    "📅 Status do pipeline ETL",
-    "🌐 Buscar contratos do PNCP em 2025",
+    "Quantos registros temos no banco?",
+    "Quais as contratações de maior valor?",
+    "Quais municípios têm mais contratos?",
+    "Busque contratos de tecnologia",
+    "Status do pipeline ETL",
+    "Buscar contratos do PNCP em 2025",
 ]
 
 MCP_SERVER_PARAMS = StdioServerParameters(
@@ -256,9 +256,12 @@ MCP_SERVER_PARAMS = StdioServerParameters(
 SYSTEM_PROMPT = (
     "Você é um assistente especializado em contratações públicas do PNCP "
     "(Portal Nacional de Contratações Públicas) com foco em Recife, PE. "
-    "Use as ferramentas disponíveis para buscar dados reais. "
+    "Use as ferramentas disponíveis para buscar dados reais EXCLUSIVAMENTE no banco de dados MongoDB. "
     "Formate os valores monetários em reais (R$). "
     "Responda sempre em português brasileiro de forma clara, objetiva e bem estruturada."
+    "Nunca saia do escopo de Recife e do PNCP e nunca tente acessar a internet ou APIs externas."
+    "Nunca entregue informações fictícias. Se não souber a resposta, diga que não sabe ou que a informação não está disponível."
+    "Nunca entregue informações confidenciais ou pessoais. Mantenha o foco em dados públicos de contratações públicas do PNCP para Recife."
 )
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -430,7 +433,6 @@ with st.sidebar:
     st.markdown(
         """
         <div style="font-size:0.8rem;color:#9B9BB4;line-height:2.0">
-        🔎 buscar_contratacoes_pncp<br>
         🗄️ consultar_mongodb<br>
         📊 resumir_contratacoes_mongodb<br>
         🔢 buscar_contratacao_por_numero<br>

@@ -13,76 +13,20 @@ mcp = FastMCP(
     name="pncp-recife",
     instructions=(
         "Você é um assistente especializado em contratações públicas do PNCP "
-        "(Portal Nacional de Contratações Públicas) com foco na cidade de Recife, PE. "
-        "Use as ferramentas disponíveis para buscar dados reais do banco de dados "
-        "e da API do PNCP. Responda sempre em português brasileiro de forma clara e objetiva."
+        "com foco na cidade de Recife, PE. "
+        "Use as ferramentas disponíveis para buscar dados reais EXCLUSIVAMENTE do banco de dados MongoDB. "
+        "Nunca tente acessar a internet ou APIs externas. Responda sempre em português brasileiro de forma clara e objetiva."
     ),
 )
 
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "ETL")
 MONGO_COLLECTION = os.getenv("MONGO_COLLECTION", "contratacoes_brutas")
-PNCP_BASE_URL = "https://pncp.gov.br/api/consulta/v1/contratacoes/proposta"
 
 
 def _get_mongo_collection():
     client = MongoClient(MONGO_URI, tlsAllowInvalidCertificates=True, serverSelectionTimeoutMS=8000)
     return client[MONGO_DB_NAME][MONGO_COLLECTION], client
-
-
-@mcp.tool()
-def buscar_contratacoes_pncp(
-    data_inicial: str = "20250101",
-    data_final: str = "20251231",
-    uf: str = "pe",
-    paginas: int = 2,
-) -> str:
-    """
-    Busca contratações públicas diretamente na API do PNCP.
-
-    Args:
-        data_inicial: Data de início no formato YYYYMMDD (ex: '20250101').
-        data_final:   Data de fim no formato YYYYMMDD (ex: '20251231').
-        uf:           Sigla do estado em minúsculas (ex: 'pe').
-        paginas:      Número de páginas a buscar (máx 5).
-    """
-    paginas = min(max(int(paginas), 1), 5)
-    todos = []
-
-    for pagina in range(1, paginas + 1):
-        params = {
-            "dataInicial": data_inicial,
-            "dataFinal": data_final,
-            "codigoModalidadeContratacao": "8",
-            "uf": uf.lower(),
-            "codigoMunicipiolbge": "2611606",
-            "pagina": str(pagina),
-            "tamanhoPagina": "20",
-        }
-        try:
-            resp = requests.get(PNCP_BASE_URL, params=params, timeout=15)
-            resp.raise_for_status()
-            dados = resp.json()
-            lista = dados.get("data", dados) if isinstance(dados, dict) else dados
-            if not lista:
-                break
-            todos.extend(lista if isinstance(lista, list) else [])
-        except Exception as e:
-            return json.dumps({"erro": f"Falha na página {pagina}: {str(e)}"}, ensure_ascii=False)
-
-    resumo = []
-    for item in todos:
-        resumo.append({
-            "numeroCompra": item.get("numeroCompra"),
-            "anoCompra": item.get("anoCompra"),
-            "objetoCompra": item.get("objetoCompra", "")[:200],
-            "valorTotalEstimado": item.get("valorTotalEstimado"),
-            "dataAtualizacao": item.get("dataAtualizacao"),
-            "municipio": item.get("unidadeOrgao", {}).get("municipioNome"),
-            "orgao": item.get("unidadeOrgao", {}).get("nomeUnidade"),
-        })
-
-    return json.dumps({"total": len(resumo), "contratacoes": resumo}, ensure_ascii=False, default=str)
 
 
 @mcp.tool()

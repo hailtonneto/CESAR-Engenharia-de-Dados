@@ -15,3 +15,4 @@ fastmcp
 mcp[cli]
 streamlit
 google-genai
+groq
