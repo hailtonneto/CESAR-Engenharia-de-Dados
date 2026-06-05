@@ -57,22 +57,53 @@ def task_carregar_mongodb(dados_brutos: list[dict], run_id: str) -> None:
 
 @task(
     name="Transformação dos Dados",
-    description="Limpa, filtra e normaliza os dados brutos.",
+    description="Limpa, filtra e normaliza os dados brutos preservando os campos aninhados.",
 )
 def task_transformar(
     dados_brutos: list[dict],
     valor_maximo: float | None,
     uf: str,
 ) -> list[dict]:
-    
+    """
+    Higieniza os dados brutos e retorna ``list[dict]`` com TODOS os campos
+    preservados (inclusive os dicionários aninhados — ``orgaoEntidade``,
+    ``unidadeOrgao``, ``amparoLegal``, links oficiais).
+
+    Esses registros alimentam tanto a carga no MongoDB (camada limpa,
+    consumida pela API) quanto a carga relacional no MySQL (onde apenas as
+    colunas escalares são utilizadas).
+    """
     logger = get_run_logger()
     logger.info(f"Iniciando transformação de {len(dados_brutos)} registros.")
 
     transformador = TransformadorDados()
-    df = transformador.transformar(dados_brutos, valor_maximo=valor_maximo, uf=uf)
+    registros = transformador.transformar_registros(
+        dados_brutos, valor_maximo=valor_maximo, uf=uf
+    )
 
-    logger.info(f"{len(df)} registros prontos após transformação.")
-    return df.to_dict(orient="records")
+    logger.info(f"{len(registros)} registros prontos após transformação.")
+    return registros
+
+
+@task(
+    name="Carga MongoDB (limpos)",
+    retries=2,
+    retry_delay_seconds=10,
+    description="Persiste os dados limpos (com campos aninhados) na coleção contratacoes_limpas.",
+)
+def task_carregar_mongodb_limpos(registros: list[dict], run_id: str) -> None:
+
+    logger = get_run_logger()
+
+    if not registros:
+        logger.warning("Nenhum registro transformado para inserir no MongoDB (limpos).")
+        return
+
+    db = DatabaseConnector()
+    db.carregar_mongodb_limpos(registros, run_id=run_id)
+    logger.info(
+        f"{len(registros)} documentos enviados à coleção limpa do MongoDB Atlas."
+    )
 
 
 @task(
@@ -82,14 +113,24 @@ def task_transformar(
     description="Insere os dados limpos na tabela MySQL (camada gold).",
 )
 def task_carregar_mysql(registros: list[dict], nome_tabela: str) -> None:
-    
+
     logger = get_run_logger()
 
     if not registros:
         logger.warning("Nenhum registro transformado para inserir no MySQL.")
         return
 
+    # Para o MySQL usamos apenas as colunas escalares (o schema relacional
+    # não comporta os dicionários aninhados). O DataFrame achatado já
+    # descarta automaticamente as colunas que não estão na lista de
+    # interesse de TransformadorDados.
     df = pd.DataFrame(registros)
+    colunas_escalares = [
+        c for c in TransformadorDados.COLUNAS_ESCALARES if c in df.columns
+    ]
+    if colunas_escalares:
+        df = df[colunas_escalares]
+
     db = DatabaseConnector()
     db.carregar_mysql(df, nome_tabela=nome_tabela)
     logger.info(f"{len(df)} linhas inseridas na tabela '{nome_tabela}'.")
@@ -99,7 +140,9 @@ def task_carregar_mysql(registros: list[dict], nome_tabela: str) -> None:
     name="ETL PNCP — Contratações Pernambuco",
     description=(
         "Pipeline completo: extrai contratações do PNCP, persiste dados brutos "
-        "no MongoDB (bronze) e dados transformados no MySQL (gold)."
+        "no MongoDB (bronze), grava os dados limpos (com campos aninhados) na "
+        "coleção contratacoes_limpas do MongoDB e os dados transformados no "
+        "MySQL (gold)."
     ),
     log_prints=True,
 )
@@ -140,6 +183,13 @@ def etl_pncp_flow(
         uf=uf,
     )
 
+    # Camada limpa no MongoDB (consumida pela API com os campos aninhados).
+    task_carregar_mongodb_limpos(
+        registros=registros_limpos,
+        run_id=run_id,
+    )
+
+    # Camada gold relacional no MySQL (apenas colunas escalares).
     task_carregar_mysql(
         registros=registros_limpos,
         nome_tabela=nome_tabela_mysql,

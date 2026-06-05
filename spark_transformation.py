@@ -13,7 +13,23 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 MONGO_COLLECTION = os.getenv("MONGO_COLLECTION")
+MONGO_COLLECTION_LIMPAS = os.getenv("MONGO_COLLECTION_LIMPAS", "contratacoes_limpas")
 MYSQL_URI = os.getenv("MYSQL_URI")
+
+# Colunas escalares que compõem o schema relacional do MySQL. Os demais
+# campos (inclusive os structs aninhados) são preservados e gravados na
+# coleção limpa do MongoDB.
+COLUNAS_MYSQL = [
+    "numeroCompra",
+    "anoCompra",
+    "objetoCompra",
+    "valorTotalEstimado",
+    "dataAtualizacao",
+    "uf",
+    "municipioNome",
+    "run_id",
+    "faixaValor",
+]
 
 
 def criar_spark_session() -> SparkSession:
@@ -29,6 +45,12 @@ def criar_spark_session() -> SparkSession:
         .config("spark.mongodb.read.collection",     MONGO_COLLECTION)
         .config("spark.mongodb.read.ssl.invalidHostNameAllowed", "true")
         .config("spark.mongodb.read.tls.insecure",   "true")
+        # Configuração de escrita para a coleção limpa do MongoDB.
+        .config("spark.mongodb.write.connection.uri", MONGO_URI)
+        .config("spark.mongodb.write.database",       MONGO_DB_NAME)
+        .config("spark.mongodb.write.collection",     MONGO_COLLECTION_LIMPAS)
+        .config("spark.mongodb.write.ssl.invalidHostNameAllowed", "true")
+        .config("spark.mongodb.write.tls.insecure",   "true")
         .getOrCreate()
     )
 
@@ -41,21 +63,21 @@ def ler_mongodb(spark: SparkSession):
 
 
 def transformar(df):
+    """
+    Higieniza os dados preservando TODOS os atributos do documento original,
+    inclusive os structs aninhados (``orgaoEntidade``, ``unidadeOrgao``,
+    ``amparoLegal``) e os links oficiais (``linksOficiais``,
+    ``linkSistemaOrigem``, ``linkProcessoEletronico``, ``linkPncp``/
+    ``linkPNCP``).
+
+    Diferente da versão anterior, NÃO restringimos as colunas via ``select``;
+    apenas adicionamos/normalizamos campos derivados. Assim o DataFrame
+    completo segue para a coleção limpa do MongoDB, e a seleção das colunas
+    escalares para o MySQL acontece somente na carga relacional.
+    """
     print("Transformando dados...")
 
-    colunas = [c for c in [
-        "numeroCompra",
-        "anoCompra",
-        "objetoCompra",
-        "valorTotalEstimado",
-        "dataAtualizacao",
-        "uf",
-        "municipioNome",
-        "run_id",
-    ] if c in df.columns]
-
-    df = df.select(colunas)
-
+    # Normaliza tipos e valores sem descartar nenhuma coluna.
     if "valorTotalEstimado" in df.columns:
         df = df.withColumn(
             "valorTotalEstimado",
@@ -71,6 +93,14 @@ def transformar(df):
     if "anoCompra" in df.columns:
         df = df.withColumn("anoCompra", col("anoCompra").cast("int"))
 
+    # Deriva municipioNome/codigoIbge a partir do struct unidadeOrgao,
+    # caso ainda não estejam achatados no topo do documento.
+    if "unidadeOrgao" in df.columns:
+        if "municipioNome" not in df.columns:
+            df = df.withColumn("municipioNome", col("unidadeOrgao.municipioNome"))
+        if "codigoIbge" not in df.columns:
+            df = df.withColumn("codigoIbge", col("unidadeOrgao.codigoIbge"))
+
     if "valorTotalEstimado" in df.columns:
         df = df.withColumn(
             "faixaValor",
@@ -83,6 +113,27 @@ def transformar(df):
     print(f"Registros após transformação: {df.count()}")
     df.show(5, truncate=True)
     return df
+
+
+def salvar_mongodb_limpos(df, collection: str = MONGO_COLLECTION_LIMPAS):
+    """
+    Espelha a carga limpa na coleção ``contratacoes_limpas`` do MongoDB,
+    preservando todos os atributos (incluindo os structs aninhados).
+
+    Usa o conector oficial do Spark para MongoDB em modo ``append`` (upsert
+    por documento já tratado a montante via ``numeroCompra``).
+    """
+    print(f"Salvando dados limpos no MongoDB — coleção '{collection}'...")
+    (
+        df.write
+        .format("mongodb")
+        .mode("append")
+        .option("collection", collection)
+        .option("idFieldList", "numeroCompra")
+        .option("operationType", "update")
+        .save()
+    )
+    print("Dados limpos sincronizados com o MongoDB Atlas.")
 
 
 def garantir_tabela(engine, nome_tabela: str):
@@ -106,6 +157,13 @@ def salvar_mysql(df, nome_tabela: str = "editais_recife_spark"):
     print(f"Salvando no MySQL — tabela '{nome_tabela}'...")
 
     import math
+
+    # O DataFrame transformado preserva os structs aninhados (para o
+    # MongoDB). Para o MySQL selecionamos apenas as colunas escalares do
+    # schema relacional, evitando tentar serializar dicts/structs.
+    colunas_relacionais = [c for c in COLUNAS_MYSQL if c in df.columns]
+    df = df.select(colunas_relacionais)
+
     pandas_df = df.toPandas()
 
     registros = []
@@ -145,6 +203,9 @@ def main():
     try:
         df_bruto = ler_mongodb(spark)
         df_limpo = transformar(df_bruto)
+        # Camada limpa no MongoDB (com structs aninhados, consumida pela API).
+        salvar_mongodb_limpos(df_limpo, collection=MONGO_COLLECTION_LIMPAS)
+        # Camada gold relacional no MySQL (apenas colunas escalares).
         salvar_mysql(df_limpo, nome_tabela="editais_recife_spark")
         print("Pipeline PySpark concluído com sucesso!")
     finally:
