@@ -1,3 +1,15 @@
+"""
+LEGADO — fluxo reduzido (extração + carga de BRUTOS no MongoDB).
+
+Este módulo NÃO é o entrypoint canônico do pipeline. Ele só persiste os
+dados brutos (camada bronze) e foi mantido como helper de extração/carga
+bruta. O fluxo COMPLETO (brutos + camada limpa `contratacoes_limpas` no
+MongoDB + carga relacional no MySQL) está em `orchestrate_prefect.py` e é o
+que `main.py` executa.
+
+Prefira `from orchestrate_prefect import etl_pncp_flow` para rodar o pipeline
+de ponta a ponta.
+"""
 import uuid
 import pandas as pd
 

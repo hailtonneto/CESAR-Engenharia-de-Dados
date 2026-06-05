@@ -6,6 +6,46 @@ from pymongo import MongoClient, UpdateOne
 
 load_dotenv()
 
+
+def montar_filtro_upsert(item: dict) -> dict:
+    """
+    Monta o filtro (chave de upsert) usado nas cargas do MongoDB.
+
+    A dedup anterior usava apenas ``numeroCompra``, o que causava colisões
+    (vários documentos compartilham o mesmo ``numeroCompra`` e registros
+    parciais sobrescreviam uns aos outros). Aqui usamos uma chave COMPOSTA
+    estável:
+
+    1. ``numeroControlePNCP`` — identificador único do PNCP, quando existir.
+       É o critério preferencial e suficiente por si só.
+    2. Caso ausente, compõe-se a chave por
+       ``orgaoEntidade.cnpj`` + ``anoCompra`` + ``numeroCompra``
+       (sequencial da compra dentro do órgão/ano).
+    3. Como último recurso (documentos sem CNPJ e sem ano), recai-se em
+       ``numeroCompra`` isolado para não quebrar a carga.
+
+    Retorna o dicionário de filtro a ser passado ao ``UpdateOne``.
+    """
+    numero_controle = item.get("numeroControlePNCP")
+    if numero_controle:
+        return {"numeroControlePNCP": numero_controle}
+
+    orgao = item.get("orgaoEntidade") or {}
+    cnpj = orgao.get("cnpj")
+    ano = item.get("anoCompra")
+    numero = item.get("numeroCompra")
+
+    if cnpj and ano is not None:
+        return {
+            "orgaoEntidade.cnpj": cnpj,
+            "anoCompra": ano,
+            "numeroCompra": numero,
+        }
+
+    # Fallback: melhor um filtro abrangente do que perder o registro.
+    return {"numeroCompra": numero}
+
+
 class DatabaseConnector:
     def __init__(self):
         self.mysql_uri = os.getenv("MYSQL_URI")
@@ -37,7 +77,7 @@ class DatabaseConnector:
                     item["run_id"] = run_id
                 operacoes.append(
                     UpdateOne(
-                        {"numeroCompra": item.get("numeroCompra")},
+                        montar_filtro_upsert(item),
                         {"$set": item},
                         upsert=True
                     )
@@ -56,10 +96,12 @@ class DatabaseConnector:
         aninhados preservados) na coleção ``contratacoes_limpas`` do MongoDB.
 
         Espelha a lógica de :meth:`carregar_mongodb`: usa ``bulk_write`` com
-        ``UpdateOne``/upsert tendo ``numeroCompra`` como chave, de modo que
-        execuções repetidas atualizam os documentos em vez de duplicá-los.
-        O nome da coleção vem da variável de ambiente
-        ``MONGO_COLLECTION_LIMPAS`` (default ``contratacoes_limpas``).
+        ``UpdateOne``/upsert tendo como chave o filtro composto montado por
+        :func:`montar_filtro_upsert` (``numeroControlePNCP`` ou
+        ``cnpj``+``anoCompra``+``numeroCompra``), de modo que execuções
+        repetidas atualizam os documentos em vez de duplicá-los. O nome da
+        coleção vem da variável de ambiente ``MONGO_COLLECTION_LIMPAS``
+        (default ``contratacoes_limpas``).
         """
         if not dados:
             print("Aviso: Lista de dados limpos para MongoDB está vazia. Nada para salvar.")
@@ -76,7 +118,7 @@ class DatabaseConnector:
                     item["run_id"] = run_id
                 operacoes.append(
                     UpdateOne(
-                        {"numeroCompra": item.get("numeroCompra")},
+                        montar_filtro_upsert(item),
                         {"$set": item},
                         upsert=True
                     )

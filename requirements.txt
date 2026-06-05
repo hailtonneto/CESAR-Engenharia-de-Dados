@@ -1,18 +1,25 @@
-# Dependências base do projeto ETL
-requests
-pandas
-pymongo
-sqlalchemy
-mysql-connector-python
-python-dotenv
-fastapi
-uvicorn
-motor
-prefect
+# Dependências base do projeto ETL (versões pinadas para reprodutibilidade).
+# Conjunto coerente, testado com Python 3.10–3.12.
+requests==2.32.3
+pandas==2.2.3
+pymongo==4.10.1
+sqlalchemy==2.0.36
+mysql-connector-python==9.1.0
+python-dotenv==1.0.1
+fastapi==0.115.6
+uvicorn==0.34.0
+motor==3.6.0
+prefect==3.1.11
+
+# Transformação distribuída (opcional — usada por spark_transformation.py)
+pyspark==3.5.4
+
+# Testes
+pytest==8.3.4
 
 # MCP + Chatbot
-fastmcp
-mcp[cli]
-streamlit
-google-genai
-groq
+fastmcp==2.3.4
+mcp[cli]==1.9.0
+streamlit==1.41.1
+google-genai==0.3.0
+groq==0.13.1

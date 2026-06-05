@@ -1,0 +1,31 @@
+# Deployment declarativo do pipeline ETL do PNCP (Prefect 3.x).
+#
+# Define um deployment agendado com cron diário às 06:00 (timezone
+# America/Recife). O flow calcula a janela de datas MÓVEL em runtime
+# (últimos ETL_JANELA_DIAS dias até hoje), portanto NÃO há datas fixas aqui.
+#
+# Como ativar:
+#   pip install -r requirements.txt
+#   prefect deploy --all          # cria/atualiza o deployment a partir deste arquivo
+#   prefect worker start -p default-agent-pool   # inicia um worker que executa os agendamentos
+#
+# Alternativa mais simples (sem worker/pool): python serve_prefect.py
+
+name: etl-pncp
+prefect-version: 3.0.0
+
+deployments:
+  - name: etl-pncp-diario
+    entrypoint: orchestrate_prefect.py:etl_pncp_flow
+    description: >-
+      Execução diária do pipeline ETL do PNCP com janela de datas móvel
+      (ETL_JANELA_DIAS). Popula contratacoes_brutas, contratacoes_limpas
+      (MongoDB) e a tabela relacional no MySQL.
+    parameters:
+      uf: pe
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 6 * * *"
+        timezone: "America/Recife"
+        active: true

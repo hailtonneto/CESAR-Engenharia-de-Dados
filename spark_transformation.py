@@ -1,12 +1,42 @@
+import os
+import platform
+
 from sqlalchemy import create_engine, text
-from pyspark.sql.functions import col, when, to_timestamp, round as spark_round
+from pyspark.sql.functions import (
+    col,
+    when,
+    to_timestamp,
+    round as spark_round,
+    coalesce,
+    concat_ws,
+)
 from pyspark.sql import SparkSession
 from dotenv import load_dotenv
 import pandas as pd
-import os
-os.environ["HADOOP_HOME"] = r"C:\hadoop"
-os.environ["PATH"] = r"C:\hadoop\bin;" + os.environ["PATH"]
 
+
+def configurar_hadoop() -> None:
+    """
+    Configura o HADOOP_HOME de forma cross-platform.
+
+    No Windows o Spark precisa do ``winutils.exe`` (HADOOP_HOME). Em vez de
+    paths hardcoded (``C:\\hadoop``), lemos o caminho da variável de ambiente
+    ``HADOOP_HOME``; se ela estiver definida, acrescentamos o ``bin`` ao PATH.
+    Em sistemas não-Windows (Linux/macOS) isso é um no-op — não é necessário.
+    """
+    if platform.system() != "Windows":
+        return
+
+    hadoop_home = os.getenv("HADOOP_HOME")
+    if not hadoop_home:
+        return
+
+    os.environ["HADOOP_HOME"] = hadoop_home
+    hadoop_bin = os.path.join(hadoop_home, "bin")
+    os.environ["PATH"] = hadoop_bin + os.pathsep + os.environ.get("PATH", "")
+
+
+configurar_hadoop()
 
 load_dotenv()
 
@@ -110,6 +140,33 @@ def transformar(df):
             .otherwise("60k–81k")
         )
 
+    # Chave de upsert ESTÁVEL e composta, espelhando montar_filtro_upsert()
+    # do src/database.py: prefere numeroControlePNCP (identificador único do
+    # PNCP); senão compõe cnpj + anoCompra + numeroCompra. Evita as colisões
+    # que ocorriam ao deduplicar apenas por numeroCompra.
+    cnpj_col = (
+        col("orgaoEntidade.cnpj")
+        if "orgaoEntidade" in df.columns
+        else col("numeroCompra").cast("string")
+    )
+    numero_controle = (
+        col("numeroControlePNCP")
+        if "numeroControlePNCP" in df.columns
+        else when(col("numeroCompra").isNull(), None).otherwise(None)
+    )
+    df = df.withColumn(
+        "_upsert_key",
+        coalesce(
+            numero_controle,
+            concat_ws(
+                "|",
+                cnpj_col,
+                col("anoCompra").cast("string"),
+                col("numeroCompra").cast("string"),
+            ),
+        ),
+    )
+
     print(f"Registros após transformação: {df.count()}")
     df.show(5, truncate=True)
     return df
@@ -120,8 +177,9 @@ def salvar_mongodb_limpos(df, collection: str = MONGO_COLLECTION_LIMPAS):
     Espelha a carga limpa na coleção ``contratacoes_limpas`` do MongoDB,
     preservando todos os atributos (incluindo os structs aninhados).
 
-    Usa o conector oficial do Spark para MongoDB em modo ``append`` (upsert
-    por documento já tratado a montante via ``numeroCompra``).
+    Usa o conector oficial do Spark para MongoDB em modo ``append`` com upsert
+    pela chave COMPOSTA estável ``_upsert_key`` (numeroControlePNCP ou
+    cnpj+anoCompra+numeroCompra), evitando colisões por ``numeroCompra``.
     """
     print(f"Salvando dados limpos no MongoDB — coleção '{collection}'...")
     (
@@ -129,8 +187,9 @@ def salvar_mongodb_limpos(df, collection: str = MONGO_COLLECTION_LIMPAS):
         .format("mongodb")
         .mode("append")
         .option("collection", collection)
-        .option("idFieldList", "numeroCompra")
+        .option("idFieldList", "_upsert_key")
         .option("operationType", "update")
+        .option("upsertDocument", "true")
         .save()
     )
     print("Dados limpos sincronizados com o MongoDB Atlas.")

@@ -1,4 +1,7 @@
+import os
 import uuid
+from datetime import datetime, timedelta
+
 import pandas as pd
 
 from prefect import flow, task, get_run_logger
@@ -9,6 +12,28 @@ from src.transformation import TransformadorDados
 from src.database import DatabaseConnector
 
 load_dotenv()
+
+
+def janela_datas(janela_dias: int | None = None) -> tuple[str, str]:
+    """
+    Calcula a janela de datas MÓVEL usada na extração, em runtime.
+
+    Em vez de datas fixas no código, a janela vai dos últimos ``N`` dias até
+    hoje (inclusive). O valor de ``N`` vem do parâmetro ou da variável de
+    ambiente ``ETL_JANELA_DIAS`` (default 30).
+
+    Retorna a tupla ``(data_inicial, data_final)`` no formato ``YYYYMMDD``
+    esperado pela API do PNCP.
+    """
+    if janela_dias is None:
+        try:
+            janela_dias = int(os.getenv("ETL_JANELA_DIAS", "30"))
+        except (TypeError, ValueError):
+            janela_dias = 30
+
+    hoje = datetime.now()
+    inicio = hoje - timedelta(days=janela_dias)
+    return inicio.strftime("%Y%m%d"), hoje.strftime("%Y%m%d")
 
 
 @task(
@@ -147,13 +172,20 @@ def task_carregar_mysql(registros: list[dict], nome_tabela: str) -> None:
     log_prints=True,
 )
 def etl_pncp_flow(
-    data_inicial: str = "20250101",
-    data_final: str = "20250430",
+    data_inicial: str | None = None,
+    data_final: str | None = None,
     uf: str = "pe",
     valor_maximo: float | None = None,
     nome_tabela_mysql: str = "editais_recife",
 ) -> None:
-    
+
+    # Janela de datas MÓVEL: quando não informadas, usa os últimos
+    # ETL_JANELA_DIAS dias até hoje (calculado em runtime, sem datas fixas).
+    if data_inicial is None or data_final is None:
+        janela_ini, janela_fim = janela_datas()
+        data_inicial = data_inicial or janela_ini
+        data_final = data_final or janela_fim
+
     run_id = str(uuid.uuid4())
     logger = get_run_logger()
 
@@ -201,8 +233,5 @@ def etl_pncp_flow(
 
 
 if __name__ == "__main__":
-    etl_pncp_flow(
-        data_inicial="20260101",
-        data_final="20260508",
-        uf="pe",
-    )
+    # Sem datas fixas: usa a janela móvel (ETL_JANELA_DIAS, default 30 dias).
+    etl_pncp_flow(uf="pe")
