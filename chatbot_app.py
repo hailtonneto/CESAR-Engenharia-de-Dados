@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 import json
+import base64
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -11,9 +12,22 @@ from groq import Groq
 
 load_dotenv()
 
+def carregar_imagem_local(caminho_imagem):
+    """Lê uma imagem local e a converte para Base64 para ser usada no HTML."""
+    try:
+        with open(caminho_imagem, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        return f"data:image/png;base64,{encoded_string}"
+    except Exception as e:
+        return "" 
+        
+logo_base64 = carregar_imagem_local("assets/logo.png")
+bot_base64 = carregar_imagem_local("assets/botinho.png")
+
+
 st.set_page_config(
     page_title="Assistente Recife MEI",
-    page_icon="🏛️",
+    page_icon=logo_base64,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -25,21 +39,29 @@ st.markdown(
 
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
+    [data-testid="stHeader"] {
+        background-color: transparent;
+    }
+
+    [data-testid="stBottom"] > div {
+        background-color: transparent !important;
+    }
+
     .stApp {
-        background: linear-gradient(135deg, #0a0a14 0%, #0f0f20 50%, #0a0a14 100%);
+        background: linear-gradient(135deg, #0D0D0D 0%, #094036 50%, #0D0D0D 100%);
         color: #E8E8F0;
     }
 
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d0d1f 0%, #111128 100%);
-        border-right: 1px solid rgba(108, 99, 255, 0.2);
+        background: linear-gradient(180deg, #094036 0%, #0D0D0D 100%);
+        border-right: 1px solid rgba(27, 191, 161, 0.2);
     }
 
-    [data-testid="stSidebar"] .stMarkdown { color: #C8C8D8; }
+    [data-testid="stSidebar"] .stMarkdown { color: #1BBFA1; }
 
     .sidebar-section {
-        background: rgba(108, 99, 255, 0.08);
-        border: 1px solid rgba(108, 99, 255, 0.2);
+        background: rgba(27, 191, 161, 0.08);
+        border: 1px solid rgba(27, 191, 161, 0.2);
         border-radius: 12px;
         padding: 16px;
         margin-bottom: 16px;
@@ -50,16 +72,16 @@ st.markdown(
         font-weight: 600;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: #6C63FF;
+        color: #1BBFA1;
         margin-bottom: 12px;
     }
 
     .main-header {
         text-align: center;
         padding: 40px 20px 30px;
-        background: linear-gradient(135deg, rgba(108,99,255,0.12) 0%, rgba(99,179,237,0.08) 100%);
+        background: linear-gradient(135deg, rgba(27, 191, 161, 0.12) 0%, rgba(23, 166, 140, 0.08) 100%);
         border-radius: 20px;
-        border: 1px solid rgba(108, 99, 255, 0.25);
+        border: 1px solid rgba(27, 191, 161, 0.25);
         margin-bottom: 32px;
         position: relative;
         overflow: hidden;
@@ -68,14 +90,14 @@ st.markdown(
     .main-header h1 {
         font-size: 2.2rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #6C63FF, #63B3ED, #B794F4);
+        background: linear-gradient(135deg, #1BBFA1, #17A68C, #107361);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         margin: 0 0 10px 0;
     }
 
-    .main-header p { color: #9B9BB4; font-size: 0.95rem; margin: 0; }
+    .main-header p { color: #E8E8F0; font-size: 0.95rem; margin: 0; }
 
     .user-message {
         display: flex;
@@ -84,14 +106,14 @@ st.markdown(
     }
 
     .user-bubble {
-        background: linear-gradient(135deg, #6C63FF, #8B5CF6);
-        color: #fff;
+        background: linear-gradient(135deg, #1BBFA1, #107361);
+        color: #ffffff;
         padding: 12px 18px;
         border-radius: 18px 18px 4px 18px;
         max-width: 75%;
         font-size: 0.95rem;
         line-height: 1.6;
-        box-shadow: 0 4px 20px rgba(108, 99, 255, 0.3);
+        box-shadow: 0 4px 20px rgba(27, 191, 161, 0.3);
     }
 
     .assistant-message {
@@ -104,8 +126,8 @@ st.markdown(
     .assistant-avatar {
         width: 38px;
         height: 38px;
-        background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
-        border: 2px solid rgba(108, 99, 255, 0.5);
+        background: linear-gradient(135deg, #094036, #107361);
+        border: 2px solid rgba(27, 191, 161, 0.5);
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -116,7 +138,7 @@ st.markdown(
 
     .assistant-bubble {
         background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(108, 99, 255, 0.2);
+        border: 1px solid rgba(27, 191, 161, 0.2);
         color: #E8E8F0;
         padding: 14px 18px;
         border-radius: 4px 18px 18px 18px;
@@ -127,8 +149,8 @@ st.markdown(
     }
 
     .tool-call-card {
-        background: rgba(108, 99, 255, 0.1);
-        border: 1px solid rgba(108, 99, 255, 0.3);
+        background: rgba(27, 191, 161, 0.1);
+        border: 1px solid rgba(27, 191, 161, 0.3);
         border-radius: 8px;
         padding: 6px 12px;
         margin-bottom: 8px;
@@ -138,15 +160,15 @@ st.markdown(
         font-size: 0.8rem;
     }
 
-    .tool-name { color: #A78BFA; font-weight: 600; font-family: 'Courier New', monospace; }
-    .tool-detail { color: #6B7280; }
+    .tool-name { color: #1BBFA1; font-weight: 600; font-family: 'Courier New', monospace; }
+    .tool-detail { color: #17A68C; }
 
     .thinking-dot {
         display: inline-block;
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #6C63FF;
+        background: #1BBFA1;
         margin: 0 3px;
         animation: bounce 1.2s infinite ease-in-out;
     }
@@ -160,17 +182,16 @@ st.markdown(
     }
 
     .stChatInput > div {
-        background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(108, 99, 255, 0.3) !important;
+        border: 1px solid rgba(27, 191, 161, 0.3) !important;
         border-radius: 16px !important;
     }
 
     .stChatInput input { color: #E8E8F0 !important; background: transparent !important; }
 
     .stButton > button {
-        background: rgba(108, 99, 255, 0.1) !important;
-        border: 1px solid rgba(108, 99, 255, 0.3) !important;
-        color: #C8C8E8 !important;
+        background: rgba(27, 191, 161, 0.1) !important;
+        border: 1px solid rgba(27, 191, 161, 0.3) !important;
+        color: #E8E8F0 !important;
         border-radius: 12px !important;
         font-size: 0.82rem !important;
         transition: all 0.2s ease !important;
@@ -178,20 +199,20 @@ st.markdown(
     }
 
     .stButton > button:hover {
-        background: rgba(108, 99, 255, 0.25) !important;
-        border-color: rgba(108, 99, 255, 0.6) !important;
+        background: rgba(27, 191, 161, 0.25) !important;
+        border-color: rgba(27, 191, 161, 0.6) !important;
         color: #fff !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 4px 16px rgba(108, 99, 255, 0.3) !important;
+        box-shadow: 0 4px 16px rgba(27, 191, 161, 0.3) !important;
     }
 
     .status-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(16, 185, 129, 0.15);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        color: #10B981;
+        background: rgba(27, 191, 161, 0.15);
+        border: 1px solid rgba(27, 191, 161, 0.4);
+        color: #E8E8F0;
         border-radius: 20px;
         padding: 4px 12px;
         font-size: 0.78rem;
@@ -202,7 +223,7 @@ st.markdown(
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: #10B981;
+        background: #1BBFA1;
         animation: blink 1.5s infinite;
     }
 
@@ -213,11 +234,11 @@ st.markdown(
 
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-    ::-webkit-scrollbar-thumb { background: rgba(108, 99, 255, 0.4); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(27, 191, 161, 0.4); border-radius: 3px; }
 
     .stTextInput > div > div > input {
         background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(108, 99, 255, 0.3) !important;
+        border: 1px solid rgba(27, 191, 161, 0.3) !important;
         border-radius: 10px !important;
         color: #E8E8F0 !important;
     }
@@ -382,9 +403,9 @@ async def chat_with_groq(
 
 with st.sidebar:
     st.markdown(
-        """
+        f"""
         <div style="text-align:center;padding:20px 0 8px;">
-            <div style="font-size:3rem;">🏛️</div>
+            <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
             <div style="font-weight:700;font-size:1.1rem;color:#E8E8F0;margin-top:8px;">
                 Assistente Recife MEI
             </div>
@@ -423,7 +444,7 @@ with st.sidebar:
         os.environ["GROQ_API_KEY"] = api_input
     st.markdown(
         '<a href="https://console.groq.com/keys" target="_blank" '
-        'style="color:#6C63FF;font-size:0.78rem;">→ Obter chave gratuita em console.groq.com</a>',
+        'style="color:#E8E8F0;font-size:0.78rem;">→ Obter chave gratuita em console.groq.com</a>',
         unsafe_allow_html=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
@@ -432,7 +453,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-title">🔧 Ferramentas MCP</div>', unsafe_allow_html=True)
     st.markdown(
         """
-        <div style="font-size:0.8rem;color:#9B9BB4;line-height:2.0">
+        <div style="font-size:0.8rem;color:#E8E8F0;line-height:2.0">
         🗄️ consultar_mongodb<br>
         📊 resumir_contratacoes_mongodb<br>
         🔢 buscar_contratacao_por_numero<br>
@@ -450,7 +471,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-title">ℹ️ Sobre</div>', unsafe_allow_html=True)
     st.markdown(
         """
-        <div style="font-size:0.82rem;color:#9B9BB4;line-height:1.7">
+        <div style="font-size:0.82rem;color:#E8E8F0;line-height:1.7">
         Pipeline ETL de contratações públicas<br>
         do PNCP para Recife/PE.<br><br>
         <b style="color:#E8E8F0">Modelo:</b> Llama 3.3 70B (Groq)<br>
@@ -470,10 +491,11 @@ with st.sidebar:
         st.rerun()
 
 st.markdown(
-    """
+    f"""
     <div class="main-header">
+        <img src="{logo_base64}" alt="Logo" style="width: 60px; height: 60px; border-radius: 50%;">
         <h1>Assistente Recife MEI</h1>
-        <p>Consulte contratações públicas com inteligência artificial • Pipeline ETL • MongoDB + PNCP API</p>
+        <p>Consulte contratações públicas com a assistente IA do Recife MEI!</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -481,11 +503,11 @@ st.markdown(
 
 if not st.session_state.messages:
     st.markdown(
-        """
+        f"""
         <div style="text-align:center;padding:32px 16px 16px;">
-            <div style="font-size:3rem;margin-bottom:12px;">🤖</div>
+            <div><img src="{bot_base64}" alt="Bot" style="width:60px; height: 60px; border-radius: 50%;"></div>
             <h3 style="color:#E8E8F0;margin:0 0 8px 0;">Como posso ajudar?</h3>
-            <p style="color:#9B9BB4;font-size:0.9rem;margin-bottom:24px;">
+            <p style="color:#E8E8F0;font-size:0.9rem;margin-bottom:24px;">
                 Faça perguntas sobre contratações públicas de Recife ou experimente uma sugestão:
             </p>
         </div>
@@ -518,7 +540,7 @@ for msg in st.session_state.messages:
             )
         st.markdown(
             f'<div class="assistant-message">'
-            f'<div class="assistant-avatar">🤖</div>'
+            f'<div class="assistant-avatar"><img src="{bot_base64}" alt="Bot" style="width: 60px; height: 60px; border-radius: 50%;"></div>'
             f'<div class="assistant-bubble">{tool_html}{msg["content"]}</div>'
             f"</div>",
             unsafe_allow_html=True,
@@ -541,7 +563,7 @@ if active_input:
     thinking_placeholder = st.empty()
     thinking_placeholder.markdown(
         '<div class="assistant-message">'
-        '<div class="assistant-avatar">🤖</div>'
+        f'<div class="assistant-avatar"><img src="{bot_base64}" alt="Bot" style="width: 60px; height: 60px; border-radius: 50%;"></div>'
         '<div class="assistant-bubble">'
         '<span class="thinking-dot"></span>'
         '<span class="thinking-dot"></span>'
@@ -597,7 +619,7 @@ if active_input:
 
     st.markdown(
         f'<div class="assistant-message">'
-        f'<div class="assistant-avatar">🤖</div>'
+        f'<div class="assistant-avatar"><img src="{bot_base64}" alt="Bot" style="width: 60px; height: 60px; border-radius: 50%;"></div>'
         f'<div class="assistant-bubble">{tool_html}{response_text}</div>'
         f"</div>",
         unsafe_allow_html=True,

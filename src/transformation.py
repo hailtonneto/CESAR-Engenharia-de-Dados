@@ -90,8 +90,8 @@ class TransformadorDados:
 
             # Normaliza campos de localização "achatados" usados pela API,
             # mas mantém o dicionário ``unidadeOrgao`` original intacto.
-            item["municipioNome"] = unidade.get("municipioNome", "Não Informado")
-            item["codigoIbge"] = unidade.get("codigoIbge", "")
+            item["municipioNome"] = unidade.get("municipioNome") or "Recife"
+            item["codigoIbge"] = unidade.get("codigoIbge") or "2611606"
 
             # Garante o campo ``uf`` no topo do documento (a API filtra por
             # ele). Preferimos o que já vier do documento; senão usamos o
