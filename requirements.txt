@@ -2,7 +2,7 @@
 # Conjunto coerente, testado com Python 3.10–3.12.
 requests==2.32.3
 pandas==2.2.3
-pymongo==4.10.1
+pymongo==4.9.0
 sqlalchemy==2.0.36
 mysql-connector-python==9.1.0
 python-dotenv==1.0.1
