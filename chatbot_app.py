@@ -12,7 +12,7 @@ from groq import Groq
 load_dotenv()
 
 st.set_page_config(
-    page_title="Assistente PNCP Recife",
+    page_title="Assistente Recife MEI",
     page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="expanded",
