@@ -7,7 +7,7 @@ python-dotenv
 fastapi
 uvicorn
 motor
-prefec
+prefect
 
 # Transformação distribuída (opcional — usada por spark_transformation.py)
 pyspark
