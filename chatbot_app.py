@@ -386,7 +386,7 @@ with st.sidebar:
         <div style="text-align:center;padding:20px 0 8px;">
             <div style="font-size:3rem;">🏛️</div>
             <div style="font-weight:700;font-size:1.1rem;color:#E8E8F0;margin-top:8px;">
-                PNCP Recife
+                Assistente Recife MEI
             </div>
             <div style="margin-top:8px;">
                 <span class="status-badge">
@@ -472,7 +472,7 @@ with st.sidebar:
 st.markdown(
     """
     <div class="main-header">
-        <h1>🏛️ Assistente PNCP Recife</h1>
+        <h1>Assistente Recife MEI</h1>
         <p>Consulte contratações públicas com inteligência artificial • Pipeline ETL • MongoDB + PNCP API</p>
     </div>
     """,
