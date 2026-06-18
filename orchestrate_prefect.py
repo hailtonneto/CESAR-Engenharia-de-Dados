@@ -19,8 +19,8 @@ def janela_datas(janela_dias: int | None = None) -> tuple[str, str]:
     Calcula a janela de datas MÓVEL usada na extração, em runtime.
 
     Em vez de datas fixas no código, a janela vai dos últimos ``N`` dias até
-    hoje (inclusive). O valor de ``N`` vem do parâmetro ou da variável de
-    ambiente ``ETL_JANELA_DIAS`` (default 30).
+    amanhã. O valor de ``N`` vem do parâmetro ou da variável de ambiente
+    ``ETL_JANELA_DIAS`` (default 30).
 
     Retorna a tupla ``(data_inicial, data_final)`` no formato ``YYYYMMDD``
     esperado pela API do PNCP.
@@ -33,7 +33,8 @@ def janela_datas(janela_dias: int | None = None) -> tuple[str, str]:
 
     hoje = datetime.now()
     inicio = hoje - timedelta(days=janela_dias)
-    return inicio.strftime("%Y%m%d"), hoje.strftime("%Y%m%d")
+    fim = hoje + timedelta(days=1)
+    return inicio.strftime("%Y%m%d"), fim.strftime("%Y%m%d")
 
 
 @task(
